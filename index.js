@@ -4,7 +4,7 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const cheerio = require('cheerio');
 const ExcelJS = require('exceljs');
 const { db } = require('./firebaseConfig');
-const { collection, setDoc, doc, getDoc } = require('firebase/firestore');
+const { collection, setDoc, doc, getDocs, getDoc } = require('firebase/firestore');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -358,21 +358,42 @@ app.post('/extract-emails', async (req, res) => {
 
     try {
         console.log(`Received request to search emails for name: "${name}" with custom document name: "${docName}"`);
-        const emails = await searchEmails(name, docName,location);
+        const emails = await searchEmails(name, docName, location);
         
         const docRef = doc(collection(db, 'scrapeddata_facebook'), docName);
         const docSnapshot = await getDoc(docRef);
+        
+        // Fetch existing emails from the document and create a Set
         const allexistingEmails = new Set(docSnapshot.exists() ? docSnapshot.data().emails : []);
+        
+        // Filter out emails that are already in the document
+        const newEmails = emails.filter(email => !allexistingEmails.has(email));
+        
+        // If there are new emails, update the Firestore document
+        if (newEmails.length > 0) {
+            // Add new emails to the existing set
+            newEmails.forEach(email => allexistingEmails.add(email));
 
-        console.log("Total Emails After Push -->",allexistingEmails);
+            // Save the updated email set back to Firestore
+            await setDoc(docRef, { emails: Array.from(allexistingEmails) });
+            
+            console.log(`Inserted ${newEmails.length} new emails.`);
+        } else {
+            console.log("No new emails to insert.");
+        }
 
-        res.json({totalNewEmails:emails.length,totalEmailsInDoc: allexistingEmails.length });
+        res.json({
+            totalNewEmails: emails.length,
+            totalEmailsInDoc: allexistingEmails.size,
+            newEmailsInserted: newEmails.length 
+        });
 
     } catch (error) {
         console.error('Error extracting emails:', error);
         res.status(500).json({ error: 'An error occurred while extracting emails' });
     }
 });
+
 
 // Start the Express server
 app.listen(PORT, () => {
