@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const docName = "Akash_Doc0411";
+const docName = "Akash_Doc1111";
 
 // List of User-Agents to rotate
 const userAgents = [
@@ -245,32 +245,40 @@ async function searchEmails(name, docName, location) {
 
             const docRef = doc(collection(db, 'scrapeddata_facebook'), docName);
 
-            try {
-                // Fetch all documents in the collection
-                const allDocsSnapshot = await getDocs(collection(db, 'scrapeddata_facebook'));
-                
-                // Aggregate emails from all documents to check for duplicates
-                const allEmailsSet = new Set();
-                allDocsSnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    if (data.emails) {
-                        data.emails.forEach(email => allEmailsSet.add(email));
-                    }
-                });
-                
-                // Filter new emails to remove duplicates
-                const uniqueEmails = Array.from(emails).filter(email => !allEmailsSet.has(email));
-                const allEmails = Array.from(new Set([...allEmailsSet, ...uniqueEmails]));
-                
-                await setDoc(docRef, {
-                    name,
-                    emails: allEmails,
-                    timestamp: new Date()
-                });
-                console.log(`Saved ${allEmails.length} emails to Firestore with custom document ID: ${docName}`);
-            } catch (error) {
-                console.error('Error saving emails to Firestore:', error);
-            }
+try {
+    // Fetch all documents in the collection
+    const allDocsSnapshot = await getDocs(collection(db, 'scrapeddata_facebook'));
+
+    // Aggregate emails from all documents to check for duplicates
+    const allEmailsSet = new Set();
+    allDocsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.emails) {
+            data.emails.forEach(email => allEmailsSet.add(email));
+        }
+    });
+
+    // Get existing emails in the current document (docRef)
+    const currentDocSnapshot = await getDoc(docRef);
+    const currentDocEmails = currentDocSnapshot.exists() ? currentDocSnapshot.data().emails || [] : [];
+
+    // Filter current document emails to remove duplicates
+    const uniqueEmails = Array.from(emails).filter(email => !allEmailsSet.has(email));
+
+    // Combine current doc's emails with new unique emails
+    const updatedEmails = Array.from(new Set([...currentDocEmails, ...uniqueEmails]));
+
+    // Update the document with the combined unique emails
+    await setDoc(docRef, {
+        name,
+        emails: updatedEmails,
+        timestamp: new Date()
+    });
+    console.log(`Added ${uniqueEmails.length} new unique emails to Firestore with custom document ID: ${docName}`);
+} catch (error) {
+    console.error('Error saving emails to Firestore:', error);
+}
+
 
             return uniqueEmails;
         } catch (error) {
