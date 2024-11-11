@@ -355,7 +355,8 @@ app.post('/extract-emails', async (req, res) => {
         const docRef = doc(collection(db, 'scrapeddata_facebook'), docName);
         const docSnapshot = await getDoc(docRef);
         const allexistingEmails = new Set(docSnapshot.exists() ? docSnapshot.data().emails : []);
-        console.log(allexistingEmails);
+
+        console.log("Total Emails After Push -->",allexistingEmails);
 
         res.json({totalNewEmails:emails.length,totalEmailsInDoc: allexistingEmails.length });
 
