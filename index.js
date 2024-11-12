@@ -160,7 +160,7 @@ async function searchEmails(name, docName, location) {
 
             const page = await browser.newPage();
             const emails = new Set();
-             const query = `${name} @gmail.com @yahoo.com senior elderly retired site:facebook.com ${location}`;
+             const query = `${name} @gmail.com @yahoo.com senior site:facebook.com ${location}`;
 
 
             // Add a random delay before navigating
@@ -275,17 +275,15 @@ try {
         timestamp: new Date()
     });
     console.log(`Added ${uniqueEmails.length} new unique emails to Firestore with custom document ID: ${docName}`);
+    return uniqueEmails;
 } catch (error) {
     console.error('Error saving emails to Firestore:', error);
+    return uniqueEmails;
 }
-
-
-            return uniqueEmails;
         } catch (error) {
             console.error('Error extracting emails:', error);
             if (!error.message.includes("TimeoutError: Waiting for selector `#more-results:not([disabled])` failed")){
                 retries = 0;
-                console.log("UniqueEmails--->",uniqueEmails);
                 return uniqueEmails;
             } else {
                 retries--;
@@ -366,26 +364,12 @@ app.post('/extract-emails', async (req, res) => {
         // Fetch existing emails from the document and create a Set
         const allexistingEmails = new Set(docSnapshot.exists() ? docSnapshot.data().emails : []);
         
-        // Filter out emails that are already in the document
-        const newEmails = emails.filter(email => !allexistingEmails.has(email));
-        
-        // If there are new emails, update the Firestore document
-        if (newEmails.length > 0) {
-            // Add new emails to the existing set
-            newEmails.forEach(email => allexistingEmails.add(email));
-
-            // Save the updated email set back to Firestore
-            await setDoc(docRef, { emails: Array.from(allexistingEmails) });
-            
-            console.log(`Inserted ${newEmails.length} new emails.`);
-        } else {
-            console.log("No new emails to insert.");
-        }
+       
 
         res.json({
             totalNewEmails: emails.length,
             totalEmailsInDoc: allexistingEmails.size,
-            newEmailsInserted: newEmails.length 
+            newEmailsInserted: emails 
         });
 
     } catch (error) {
