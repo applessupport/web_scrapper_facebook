@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-const docName = "Akash_Doc1111";
+const docName = "Akash_Doc1311";
 
 // List of User-Agents to rotate
 const userAgents = [
@@ -160,7 +160,7 @@ async function searchEmails(name, docName, location) {
 
             const page = await browser.newPage();
             const emails = new Set();
-             const query = `${name} @gmail.com @yahoo.com senior site:facebook.com ${location}`;
+             const query = `${name} @gmail.com senior site:facebook.com ${location}`;
 
 
             // Add a random delay before navigating
