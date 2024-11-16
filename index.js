@@ -1,5 +1,5 @@
 const express = require('express');
-const { Builder, By, Key, until } = require('selenium-webdriver');
+const { Builder, By, until } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 const cheerio = require('cheerio');
 const ExcelJS = require('exceljs');
@@ -39,8 +39,8 @@ async function searchEmails(name, docName, location) {
             const emailRegex = /(?<!\.)\b[a-zA-Z0-9._%+-]+@(gmail\.com|yahoo\.com)\b/g;
 
             console.log("Searching...");
-            let moreResultsCount = 0;
             let matchCount = 0;
+            let moreResultsCount = 0;
             while (true) {
                 const pageContent = await driver.getPageSource();
                 const $ = cheerio.load(pageContent);
@@ -49,37 +49,33 @@ async function searchEmails(name, docName, location) {
                     const text = $(element).text();
                     const matches = text.match(emailRegex);
                     if (matches) {
-                        matchCount = matchCount + 1;
+                        matchCount += matches.length;
                         matches.forEach(email => {
                             if (!email.startsWith('.') && !/[+&$]/.test(email)) {
                                 emails.add(email);
                             }
                         });
-                      
-                        console.log("Match Count-->",matchCount);
+                        console.log("Matched");
                     }
                 });
 
-                try {
-                    const moreResultsButton = await driver.findElement(By.id('more-results'));
-                    await moreResultsButton.click();
+                // Attempt to locate and click the "More Results" button with retries
+                const moreResultsClicked = await fetchAndClickMoreResults(driver);
+                if (!moreResultsClicked) {
+                    console.log('No more results found. Stopping scraping.');
+                    break;
+                }else{
                     moreResultsCount++;
-                    await delay(randomDelay(100, 500));
-                    console.log("Clicked More Results Button",moreResultsCount);
-                } catch (error) {
-                    if (error.name === 'NoSuchElementError') {
-                        console.log('No more results found. Stopping scraping.');
-                        break; // Stop the scraping loop if "More Results" button is not found
-                    } else {
-                        throw error; // Rethrow other errors if they occur
-                    }
+                    console.log('More results found. Continuing scraping.',moreResultsCount);
                 }
+
+                await delay(randomDelay(100, 500));
             }
 
             uniqueEmails = Array.from(emails);
-            const finalemails = await saveEmailsToFirestore(uniqueEmails, name, docName);
+            const finalEmails = await saveEmailsToFirestore(uniqueEmails, name, docName);
             await driver.quit();
-            return finalemails;
+            return finalEmails;
 
         } catch (error) {
             console.error('Error extracting emails:', error);
@@ -101,44 +97,26 @@ async function searchEmails(name, docName, location) {
     }
 }
 
-// Helper to locate elements with retry to handle StaleElementReferenceError
-async function tryLocateElement(driver, locator, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
+// Function to locate and click the "More Results" button with retry logic
+async function fetchAndClickMoreResults(driver, maxRetries = 3) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-            const element = await driver.wait(until.elementLocated(locator), 5000);
-            if (element) return element;
+            const moreResultsButton = await driver.findElement(By.id('more-results'));
+            await moreResultsButton.click();
+            return true; // Successfully clicked
         } catch (error) {
             if (error.name === 'StaleElementReferenceError') {
-                console.log(`Retrying due to stale reference... (${i + 1}/${maxRetries})`);
-                await delay(500); // Wait before retrying
-            } else {
-                throw error;
-            }
-        }
-    }
-    return null; // Return null if element not found after retries
-}
-
-// Helper function to click safely with retry to avoid StaleElementReferenceError
-async function safeClick(driver, element, maxRetries = 3) {
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            await element.click();
-            return;
-        } catch (error) {
-            if (error.name === 'StaleElementReferenceError') {
-                console.log(`Retrying click due to stale reference... (${i + 1}/${maxRetries})`);
+                console.log(`Retrying to locate 'More Results' due to stale element... (Attempt ${attempt + 1})`);
                 await delay(500);
-                // Re-locate the element
-                element = await tryLocateElement(driver, By.id('more-results'));
-                if (!element) {
-                    throw new Error("Element not found for retry.");
-                }
+            } else if (error.name === 'NoSuchElementError') {
+                console.log('No "More Results" button found.');
+                return false; // Button not found, end loop
             } else {
                 throw error;
             }
         }
     }
+    return false;
 }
 
 async function saveEmailsToFirestore(emails, name, docName) {
@@ -205,12 +183,23 @@ app.post('/extract-emails', async (req, res) => {
     try {
         console.log(`Request to search emails for name: "${name}" with document: "${docName}"`);
         const emails = await searchEmails(name, docName, location);
-        res.json({ totalNewEmails: emails.length, newEmailsInserted: emails });
+
+        // Fetch the document to get the total email count
+        const docRef = doc(collection(db, 'scrapeddata_facebook'), docName);
+        const docSnapshot = await getDoc(docRef);
+        
+        // Get existing emails in the document
+        const existingEmails = docSnapshot.exists() ? docSnapshot.data().emails || [] : [];
+        
+        res.json({
+            totalNewEmails: emails.length,
+            newEmailsInserted: emails,
+            totalEmailsInDoc: existingEmails.length // Add total email count in the document
+        });
     } catch (error) {
         console.error('Error extracting emails:', error);
         res.status(500).json({ error: 'An error occurred while extracting emails' });
     }
 });
 
-// Start the server
 app.listen(PORT, () => console.log(`Server is running on http://localhost:${PORT}`));
