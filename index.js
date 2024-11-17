@@ -14,7 +14,7 @@ app.use(express.json());
 const docName = "Akash_Doc1311";
 
 // Random delay generator
-function randomDelay(min = 5000, max = 15000) {
+function randomDelay(min = 50, max = 150) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -55,7 +55,6 @@ async function searchEmails(name, docName, location) {
                                 emails.add(email);
                             }
                         });
-                        console.log("Matched");
                     }
                 });
 
@@ -65,11 +64,15 @@ async function searchEmails(name, docName, location) {
                     console.log('No more results found. Stopping scraping.');
                     break;
                 }else{
+                    if(moreResultsCount > 500){
+                        console.log('More than 1000 results found. Stopping scraping.');
+                        break;
+                    }
                     moreResultsCount++;
                     console.log('More results found. Continuing scraping.',moreResultsCount);
                 }
 
-                await delay(randomDelay(100, 500));
+                await delay(randomDelay(50, 100));
             }
 
             uniqueEmails = Array.from(emails);
