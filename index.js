@@ -7,7 +7,7 @@ const { db } = require('./firebaseConfig');
 const { collection, setDoc, doc, getDocs, getDoc } = require('firebase/firestore');
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT =  3000;
 
 app.use(express.json());
 
