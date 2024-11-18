@@ -14,7 +14,7 @@ app.use(express.json());
 const docName = "Akash_Doc1411";
 
 // Random delay generator
-function randomDelay(min = 10, max = 100) {
+function randomDelay(min = 10, max = 50) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
@@ -64,15 +64,15 @@ async function searchEmails(name, docName, location) {
                     console.log('No more results found. Stopping scraping.');
                     break;
                 }else{
-                    if(moreResultsCount > 250){
-                        console.log('More than 250 results found. Stopping scraping.');
+                    if(moreResultsCount > 160){
+                        console.log('More than 160 results found. Stopping scraping.');
                         break;
                     }
                     moreResultsCount++;
                     console.log('More results found. Continuing scraping.',moreResultsCount);
                 }
 
-                await delay(randomDelay(10, 50));
+                await delay(randomDelay(10, 20));
             }
 
             uniqueEmails = Array.from(emails);
