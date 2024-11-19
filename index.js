@@ -161,6 +161,8 @@ async function saveEmailsToFirestore(emails, name, docName) {
     }
 }
 
+
+
 // Endpoint to extract emails using names from Excel
 app.post('/extract-emails', async (req, res) => {
     const { location} = req.body;
@@ -170,15 +172,23 @@ app.post('/extract-emails', async (req, res) => {
     try {
         const names = await readNamesFromExcel(excelPath);
         const emails = await searchEmails(names, docName, location);
+        const docRef = doc(collection(db, 'scrapeddata_facebook'), docName);
+        const docSnapshot = await getDoc(docRef);
+        
+        // Get existing emails in the document
+        const existingEmails = docSnapshot.exists() ? docSnapshot.data().emails || [] : [];
 
         res.json({
             totalNewEmails: emails.length,
             newEmailsInserted: emails,
+            TotalEmailsInDoc: existingEmails.length
         });
     } catch (error) {
         console.error('Error extracting emails:', error);
         res.status(500).json({ error: 'An error occurred while extracting emails' });
     }
 });
+
+
 
 app.listen(PORT, () => console.log(`Server is running on http://localhost:${PORT}`));
